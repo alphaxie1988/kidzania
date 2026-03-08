@@ -7,13 +7,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Ticket Users Visualizer",page_icon="🎫")
-st.markdown("""
-    <style>
-    header.stAppHeader {
-        display: none;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# st.markdown("""
+#     <style>
+#     header.stAppHeader {
+#         display: none;
+#     }
+#     </style>
+# """, unsafe_allow_html=True)
 def createbutton(text,link):
     st.markdown(f"""
     <style>
