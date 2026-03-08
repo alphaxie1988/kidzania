@@ -258,9 +258,6 @@ with st.container(border=True):
                 background: linear-gradient(135deg, #fff5f5, #ffe6e6);
             }
 
-            section[data-testid="stSidebar"] {
-                background-color: #ffffff;
-            }
             </style>
         """, unsafe_allow_html=True)
     if running_number.startswith("KZK") and token:
@@ -271,9 +268,7 @@ with st.container(border=True):
                 background: linear-gradient(135deg, #f0fff4, #d4f5dd);
             }
 
-            section[data-testid="stSidebar"] {
-                background-color: #ffffff;
-            }
+       
             </style>
         """, unsafe_allow_html=True)
 
