@@ -6,14 +6,96 @@ import streamlit as st
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Ticket Users Visualizer",page_icon="🎫")
-# st.markdown("""
-#     <style>
-#     header.stAppHeader {
-#         display: none;
-#     }
-#     </style>
-# """, unsafe_allow_html=True)
+st.set_page_config(page_title="Ticket Users Visualizer", page_icon="🎫")
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --kz-navy:  #1e4385;
+    --kz-gold:  #ffc727;
+    --kz-dark:  #1e0a3c;
+    --kz-gray:  #6f7287;
+    --kz-border: #cbd5e0;
+    --kz-bg:    #f8f7fa;
+    --kz-shadow: 0 5px 10px rgba(154,160,185,.06), 0 15px 40px rgba(166,173,201,.18);
+}
+
+/* ── Global font ─────────────────────────────────── */
+html, body, [class*="css"] {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* ── App background ──────────────────────────────── */
+.stApp { background-color: var(--kz-bg) !important; }
+
+/* ── Sidebar ─────────────────────────────────────── */
+section[data-testid="stSidebar"] {
+    background-color: var(--kz-dark) !important;
+    background-image: url('https://kidzania-sg.thecoolmelon.com/static/media/brick-bg.2e8ac85639cab660df03.png');
+    background-size: 220px;
+    background-blend-mode: soft-light;
+}
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p {
+    color: rgba(255,255,255,.85) !important;
+}
+section[data-testid="stSidebar"] input[type="number"] {
+    background: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.25) !important;
+    color: white !important;
+    border-radius: 8px !important;
+}
+
+/* ── Headings ────────────────────────────────────── */
+h1 { color: var(--kz-navy) !important; font-weight: 700 !important; }
+h2, h3 { color: var(--kz-navy) !important; }
+
+/* ── Bordered containers (ticket cards) ──────────── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 16px !important;
+    border: 1.5px solid var(--kz-border) !important;
+    box-shadow: var(--kz-shadow) !important;
+    background: white !important;
+}
+
+/* ── Expanders ───────────────────────────────────── */
+[data-testid="stExpander"] {
+    border-radius: 10px !important;
+    border: 1px solid var(--kz-border) !important;
+    background: white !important;
+}
+
+/* ── Subheader accent line ───────────────────────── */
+[data-testid="stHeadingWithActionElements"] h2,
+[data-testid="stHeadingWithActionElements"] h3 {
+    border-left: 4px solid var(--kz-gold);
+    padding-left: 10px;
+}
+
+/* ── Warning / info / error boxes ───────────────── */
+[data-testid="stAlert"] {
+    border-radius: 10px !important;
+}
+
+/* ── Hide sidebar & header ───────────────────────── */
+section[data-testid="stSidebar"] { display: none !important; }
+header[data-testid="stHeader"] { display: none !important; }
+
+/* ── Sticky ticket ID bar ────────────────────────── */
+div:has(> div[data-testid="stNumberInput"]) {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--kz-bg);
+    padding: 1.6rem;
+    border-bottom: 2px solid var(--kz-gold);
+    box-shadow: 0 3px 14px rgba(30,10,60,0.07);
+}
+</style>
+""", unsafe_allow_html=True)
+
 def createbutton(text,link):
     st.markdown(f"""
     <style>
@@ -23,19 +105,19 @@ def createbutton(text,link):
         font-size: 15px;
         font-weight: 600;
         color: white !important;
-        background: linear-gradient(135deg, #6b7280, #4b5563);
+        background: #1e4385;
         border-radius: 10px;
         text-decoration: none !important;
-        transition: all 0.25s ease;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: all 0.22s ease;
+        box-shadow: 0 4px 14px rgba(30,67,133,0.25);
     }}
 
     .modern-button:hover {{
         color: white !important;
         text-decoration: none !important;
-        background: linear-gradient(135deg, #4b5563, #374151);
+        background: #163269;
         transform: translateY(-2px);
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+        box-shadow: 0 6px 20px rgba(30,67,133,0.35);
     }}
 
     .modern-button:visited {{
@@ -66,133 +148,112 @@ session.headers.update({
 # =========================================================
 # CONFIG
 # =========================================================
-MISS_LIMIT = 10
-INITIAL_STEP = 1
-MAX_STEP = 2_000
 TIMEOUT = 5
+GAP_SCAN = 20  # linear scan forward at end to catch small gaps
 
 
 # =========================================================
-# CHECK FUNCTION (replace this with your real logic)
+# CHECK FUNCTION
 # =========================================================
-def check(running_number: int) -> bool:
-    """
-    Return True if this running_number has a response. 
-    Return False if it does not.
-    """
-
-    # ===== EXAMPLE: HTTP request =====
-    # Replace URL and logic as needed
-
-    url = f"https://backend.thecoolmelon.com/ticket/user/get?ticket_id={running_number}"
-    
+def check(ticket_id: int) -> bool:
+    url = f"https://backend.thecoolmelon.com/ticket/user/get?ticket_id={ticket_id}"
     try:
         resp = session.get(url, timeout=TIMEOUT)
-        # Define what "response" means to you
         if resp.status_code == 201 and resp.text.strip() != '{"message":"Get Ticket Users","ticket_users":{"count":0,"rows":[]},"ticket":null}':
             return True
-
         return False
-
     except requests.RequestException:
         return False
 
 
 # =========================================================
-# ADAPTIVE BRUTE FORCE SEARCH
+# FIND LATEST TICKET — exponential search + binary search
+# O(log n) API calls vs the old O(n) linear scan
 # =========================================================
-def find_max_running_number(
-    check_fn,
-    start=startValue,
-    initial_step=INITIAL_STEP,
-    max_step=MAX_STEP,
-    miss_limit=MISS_LIMIT,
-):
-    n = start
-    step = initial_step
+def find_latest_ticket(check_fn, start, status_fn=None):
+    """
+    Phase 1 — scan backward from start to find a valid anchor (in case
+               startValue is stale).
+    Phase 2 — exponential jumps forward to bracket the upper bound.
+    Phase 3 — binary search within the bracket to find the exact boundary.
+    Phase 4 — short linear scan forward to handle small gaps at the tail.
+    """
+    def log(msg):
+        print(msg)
+        if status_fn:
+            status_fn(msg)
 
-    last_success = None
-    consecutive_miss = 0
-
-    print("Starting adaptive scan...")
-
-    while consecutive_miss < miss_limit:
-        ok = check_fn(n)
-        print(f"Testing {n} | step={step} | ok={ok}")
-
-        if ok:
-            last_success = n
-            consecutive_miss = 0
-
-            # speed up
-            step = min(step * 2, max_step)
-            n += step
+    # Phase 1: anchor
+    log(f"Checking start point {start}...")
+    if not check_fn(start):
+        log("Start invalid, scanning backward...")
+        for back in range(start - 1, max(0, start - 500), -1):
+            if check_fn(back):
+                start = back
+                log(f"Anchor found at {start}")
+                break
         else:
-            consecutive_miss += 1
+            log("No valid anchor found.")
+            return None
 
-            # slow down
-            step = max(1, step // 2)
-            n += step
+    # Phase 2: exponential jump
+    log("Jumping forward exponentially...")
+    lo = start
+    step = 64
+    hi = lo + step
+    while check_fn(hi):
+        lo = hi
+        step = min(step * 2, 10_000)
+        hi = lo + step
+        log(f"Jumped to {hi}...")
 
-        time.sleep(0.05)  # prevent hammering API
-
-    print("Boundary detected.")
-    return last_success
-
-
-# =========================================================
-# FINAL LINEAR REFINEMENT (PRECISE)
-# =========================================================
-def refine_linear(check_fn, start, miss_limit=MISS_LIMIT):
-    print("Refining with linear scan...")
-
-    last_success = None
-    consecutive_miss = 0
-    n = start
-
-    while consecutive_miss < miss_limit:
-        ok = check_fn(n)
-        print(f"Refine {n} | ok={ok}")
-
-        if ok:
-            last_success = n
-            consecutive_miss = 0
+    # Phase 3: binary search in [lo, hi]
+    log(f"Binary searching in [{lo}, {hi}]...")
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if check_fn(mid):
+            lo = mid
         else:
-            consecutive_miss += 1
+            hi = mid
+        log(f"  Range narrowed to [{lo}, {hi}]")
 
-        n += 1
-        time.sleep(0.05)
-
-    return last_success
+    # Phase 4: short forward scan for gap tolerance
+    result = lo
+    for n in range(lo + 1, lo + GAP_SCAN + 1):
+        if check_fn(n):
+            result = n
+    log(f"Latest ticket: {result}")
+    return result
 
 
 # =========================================================
 # MAIN
 # =========================================================
-if st.sidebar.button("Find the latest Ticket"):
-    rough_max = find_max_running_number(check)
-    print(f"Rough max candidate: {rough_max}")
-
-    if rough_max is not None:
-        exact_max = refine_linear(check, rough_max - 20)
-        startValue = exact_max
-        st.sidebar.info(f"✅ The latest ticket found.")
+def run_search(start):
+    msg = st.empty()
+    msg.info("🔍 Finding latest ticket...")
+    latest = find_latest_ticket(check, start, status_fn=lambda m: msg.info(m))
+    msg.empty()
+    if latest is not None:
         with open('lastknown.txt', 'w') as f:
-            f.write(str(exact_max))
+            f.write(str(latest))
+        return latest
     else:
-        st.sidebar.error("❌ No valid running number found.")
+        return start
 
+# Auto-search on first load
+if 'auto_searched' not in st.session_state:
+    st.session_state.auto_searched = True
+    startValue = run_search(startValue)
 
-
-st.title("Ticket Users Visualizer")
-
-# --- Ticket ID input ---
-ticket_id = st.sidebar.number_input(
+# --- Ticket ID input (sticky) ---
+ticket_id = st.number_input(
     "Ticket ID",
     min_value=1,
     step=1,
     value=startValue
 )
+
 
 def format_text(text: str) -> str:
     """Convert underscores to spaces and apply title case."""
@@ -255,7 +316,7 @@ with st.container(border=True):
         st.markdown("""
             <style>
             .stApp {
-                background: linear-gradient(135deg, #fff5f5, #ffe6e6);
+                background: linear-gradient(to bottom, #ffffff, #ffe6e6);
             }
 
             </style>
@@ -265,7 +326,7 @@ with st.container(border=True):
         st.markdown("""
             <style>
             .stApp {
-                background: linear-gradient(135deg, #f0fff4, #d4f5dd);
+                background: linear-gradient(to bottom, #ffffff, #d4f5dd);
             }
 
        
