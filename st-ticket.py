@@ -74,9 +74,22 @@ h2, h3 { color: var(--kz-navy) !important; }
     padding-left: 10px;
 }
 
-/* ── Warning / info / error boxes ───────────────── */
-[data-testid="stAlert"] {
+
+/* ── Warning alert ───────────────────────────────── */
+[data-testid="stAlert"],
+[data-testid="stAlert"] > div,
+[data-baseweb="notification"] {
+    background-color: #ffc727 !important;
+    border: none !important;
+    color: #000000 !important;
     border-radius: 10px !important;
+}
+[data-testid="stAlert"] p,
+[data-testid="stAlert"] span,
+[data-testid="stAlert"] div,
+[data-testid="stAlert"] svg {
+    color: #000000 !important;
+    fill: #000000 !important;
 }
 
 /* ── Hide sidebar & header ───────────────────────── */
@@ -105,17 +118,17 @@ def createbutton(text,link):
         font-size: 15px;
         font-weight: 600;
         color: white !important;
-        background: #1e4385;
+        background: rgb(174,27,59);
         border-radius: 10px;
         text-decoration: none !important;
         transition: all 0.22s ease;
-        box-shadow: 0 4px 14px rgba(30,67,133,0.25);
+        box-shadow: 0 4px 14px rgba(174,27,59,0.25);
     }}
 
     .modern-button:hover {{
         color: white !important;
         text-decoration: none !important;
-        background: #163269;
+        background: rgb(140,20,46);
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(30,67,133,0.35);
     }}
@@ -170,7 +183,7 @@ def check(ticket_id: int) -> bool:
 # FIND LATEST TICKET — exponential search + binary search
 # O(log n) API calls vs the old O(n) linear scan
 # =========================================================
-def find_latest_ticket(check_fn, start, status_fn=None):
+def find_latest_ticket(check_fn, start, progress_fn=None):
     """
     Phase 1 — scan backward from start to find a valid anchor (in case
                startValue is stale).
@@ -178,51 +191,53 @@ def find_latest_ticket(check_fn, start, status_fn=None):
     Phase 3 — binary search within the bracket to find the exact boundary.
     Phase 4 — short linear scan forward to handle small gaps at the tail.
     """
-    def log(msg):
-        print(msg)
-        if status_fn:
-            status_fn(msg)
+    def report(p):
+        print(f"Progress: {p:.0%}")
+        if progress_fn:
+            progress_fn(min(max(p, 0.0), 1.0))
 
-    # Phase 1: anchor
-    log(f"Checking start point {start}...")
+    # Phase 1: anchor (0–10%)
+    report(0.02)
     if not check_fn(start):
-        log("Start invalid, scanning backward...")
         for back in range(start - 1, max(0, start - 500), -1):
             if check_fn(back):
                 start = back
-                log(f"Anchor found at {start}")
                 break
         else:
-            log("No valid anchor found.")
             return None
+    report(0.10)
 
-    # Phase 2: exponential jump
-    log("Jumping forward exponentially...")
+    # Phase 2: exponential jump (10–40%)
     lo = start
     step = 64
     hi = lo + step
+    exp_p = 0.10
     while check_fn(hi):
         lo = hi
         step = min(step * 2, 10_000)
         hi = lo + step
-        log(f"Jumped to {hi}...")
+        exp_p = min(exp_p + 0.06, 0.38)
+        report(exp_p)
+    report(0.40)
 
-    # Phase 3: binary search in [lo, hi]
-    log(f"Binary searching in [{lo}, {hi}]...")
+    # Phase 3: binary search in [lo, hi] (40–90%)
+    initial_range = max(hi - lo, 1)
     while hi - lo > 1:
         mid = (lo + hi) // 2
         if check_fn(mid):
             lo = mid
         else:
             hi = mid
-        log(f"  Range narrowed to [{lo}, {hi}]")
+        progress = 0.40 + 0.50 * (1 - (hi - lo) / initial_range)
+        report(progress)
 
-    # Phase 4: short forward scan for gap tolerance
+    # Phase 4: short forward scan for gap tolerance (90–100%)
     result = lo
-    for n in range(lo + 1, lo + GAP_SCAN + 1):
+    for i, n in enumerate(range(lo + 1, lo + GAP_SCAN + 1)):
         if check_fn(n):
             result = n
-    log(f"Latest ticket: {result}")
+        report(0.90 + 0.10 * (i + 1) / GAP_SCAN)
+
     return result
 
 
@@ -230,10 +245,9 @@ def find_latest_ticket(check_fn, start, status_fn=None):
 # MAIN
 # =========================================================
 def run_search(start):
-    msg = st.empty()
-    msg.info("🔍 Finding latest ticket...")
-    latest = find_latest_ticket(check, start, status_fn=lambda m: msg.info(m))
-    msg.empty()
+    bar = st.progress(0, text="Finding latest ticket...")
+    latest = find_latest_ticket(check, start, progress_fn=lambda p: bar.progress(p, text="Finding latest ticket..."))
+    bar.empty()
     if latest is not None:
         with open('lastknown.txt', 'w') as f:
             f.write(str(latest))
@@ -282,7 +296,12 @@ with st.container(border=True):
 
     count = 0
     if not hasattr(ticket, 'items'):
-        st.error("Ticket data is not in the expected format/ Ticket have not been sold")
+        st.markdown("""
+            <div style="background-color: rgb(174,27,59); color: white; padding: 1rem 1.2rem;
+                        border-radius: 10px; font-weight: 500; font-size: 0.95rem;">
+                ❌ Ticket data is not in the expected format / Ticket has not been sold
+            </div>
+        """, unsafe_allow_html=True)
         st.stop()
     for k, v in ticket.items():
         if k in important_keys_ticket:
