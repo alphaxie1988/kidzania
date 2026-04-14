@@ -30,6 +30,8 @@ html, body, [class*="css"] {
 /* ── App background ──────────────────────────────── */
 .stApp { background-color: var(--kz-bg) !important; }
 
+.stMainBlockContainer {1rem 1rem 10rem !important;}
+
 /* ── Sidebar ─────────────────────────────────────── */
 section[data-testid="stSidebar"] {
     background-color: var(--kz-dark) !important;
