@@ -43,12 +43,6 @@ section[data-testid="stSidebar"] label,
 section[data-testid="stSidebar"] p {
     color: rgba(255,255,255,.85) !important;
 }
-section[data-testid="stSidebar"] input[type="number"] {
-    background: rgba(255,255,255,.1) !important;
-    border-color: rgba(255,255,255,.25) !important;
-    color: white !important;
-    border-radius: 8px !important;
-}
 
 /* ── Headings ────────────────────────────────────── */
 h1 { color: var(--kz-navy) !important; font-weight: 700 !important; }
@@ -98,15 +92,49 @@ h2, h3 { color: var(--kz-navy) !important; }
 section[data-testid="stSidebar"] { display: none !important; }
 header[data-testid="stHeader"] { display: none !important; }
 
-/* ── Sticky ticket ID bar ────────────────────────── */
-div:has(> div[data-testid="stNumberInput"]) {
+/* ── Sticky ticket nav bar ───────────────────────── */
+[data-testid="stVerticalBlock"]:has(> div > [data-testid="stMarkdownContainer"] > #ticket-nav-root) {
     position: sticky;
     top: 0;
     z-index: 100;
     background: var(--kz-bg);
-    padding: 1.6rem;
+    padding: 0.8rem 1.6rem 0.4rem;
     border-bottom: 2px solid var(--kz-gold);
     box-shadow: 0 3px 14px rgba(30,10,60,0.07);
+}
+[data-testid="stHorizontalBlock"]:has(#ticket-nav) button {
+    background-color: var(--kz-navy) !important;
+    color: var(--kz-gold) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    height: 3.5rem !important;
+    transition: all 0.18s ease !important;
+}
+[data-testid="stHorizontalBlock"]:has(#ticket-nav) button:hover {
+    background-color: var(--kz-dark) !important;
+    transform: scale(1.06) !important;
+}
+[data-testid="stHorizontalBlock"]:has(#ticket-nav) button:active {
+    transform: scale(0.97) !important;
+}
+.ticket-id-label {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--kz-gray);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.ticket-id-value {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--kz-navy);
+    margin: 0;
+    line-height: 1.1;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -179,6 +207,57 @@ def check(ticket_id: int) -> bool:
         return False
     except requests.RequestException:
         return False
+
+
+def get_ticket_meta(ticket_id: int) -> dict | None:
+    url = f"https://backend.thecoolmelon.com/ticket/user/get?ticket_id={ticket_id}"
+    try:
+        resp = session.get(url, timeout=TIMEOUT)
+        if resp.status_code != 201:
+            return None
+        data = resp.json()
+        ticket = data.get('ticket')
+        return ticket if ticket and isinstance(ticket, dict) else None
+    except (requests.RequestException, ValueError):
+        return None
+
+
+def matches_filter(ticket_id: int, skip_unpaid: bool, prefix: str, open_date_only: bool) -> bool:
+    ticket = get_ticket_meta(ticket_id)
+    if ticket is None:
+        return False
+    if skip_unpaid:
+        pd = ticket.get('payment_date', '')
+        if pd is None or pd == "":
+            return False
+    if open_date_only:
+        if not ticket.get('is_open_date'):
+            return False
+    if prefix != "All":
+        rn = ticket.get('running_number', '')
+        if prefix == "Others":
+            if rn.startswith("KZS") or rn.startswith("KZK"):
+                return False
+        elif not rn.startswith(prefix):
+            return False
+    return True
+
+
+def find_prev_matching(start_id: int, skip_unpaid: bool, prefix: str, open_date_only: bool, max_steps: int = 500) -> int | None:
+    for step in range(1, max_steps + 1):
+        check_id = start_id - step
+        if check_id < 1:
+            return None
+        if matches_filter(check_id, skip_unpaid, prefix, open_date_only):
+            return check_id
+    return None
+
+
+def find_next_matching(start_id: int, skip_unpaid: bool, prefix: str, open_date_only: bool, max_steps: int = 500) -> int | None:
+    for step in range(1, max_steps + 1):
+        if matches_filter(start_id + step, skip_unpaid, prefix, open_date_only):
+            return start_id + step
+    return None
 
 
 # =========================================================
@@ -262,13 +341,66 @@ if 'auto_searched' not in st.session_state:
     st.session_state.auto_searched = True
     startValue = run_search(startValue)
 
-# --- Ticket ID input (sticky) ---
-ticket_id = st.number_input(
-    "Ticket ID",
-    min_value=1,
-    step=1,
-    value=startValue
-)
+if 'ticket_id' not in st.session_state:
+    st.session_state.ticket_id = startValue
+if 'skip_unpaid' not in st.session_state:
+    st.session_state.skip_unpaid = True
+if 'prefix_filter' not in st.session_state:
+    st.session_state.prefix_filter = "KZS"
+if 'open_date_only' not in st.session_state:
+    st.session_state.open_date_only = False
+
+# --- Sticky nav bar: ticket nav + filters ---
+with st.container():
+    st.markdown('<div id="ticket-nav-root"></div>', unsafe_allow_html=True)
+    col_prev, col_id, col_next = st.columns([1, 5, 1])
+    with col_prev:
+        if st.button("◀", use_container_width=True, key="prev_ticket"):
+            _skip = st.session_state.get("skip_unpaid", False)
+            _prefix = st.session_state.get("prefix_filter", "All")
+            _open = st.session_state.get("open_date_only", False)
+            if _skip or _prefix != "All" or _open:
+                new_id = find_prev_matching(st.session_state.ticket_id, _skip, _prefix, _open)
+                if new_id is None:
+                    st.toast("No more matching tickets before this one.", icon="⚠️")
+                else:
+                    st.session_state.ticket_id = new_id
+                    st.rerun()
+            else:
+                st.session_state.ticket_id = max(1, st.session_state.ticket_id - 1)
+                st.rerun()
+    with col_id:
+        st.markdown(
+            f'<div id="ticket-nav">'
+            f'<p class="ticket-id-label">Ticket ID</p>'
+            f'<p class="ticket-id-value">{st.session_state.ticket_id}</p>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with col_next:
+        if st.button("▶", use_container_width=True, key="next_ticket"):
+            _skip = st.session_state.get("skip_unpaid", False)
+            _prefix = st.session_state.get("prefix_filter", "All")
+            _open = st.session_state.get("open_date_only", False)
+            if _skip or _prefix != "All" or _open:
+                new_id = find_next_matching(st.session_state.ticket_id, _skip, _prefix, _open)
+                if new_id is None:
+                    st.toast("No more matching tickets ahead.", icon="⚠️")
+                else:
+                    st.session_state.ticket_id = new_id
+                    st.rerun()
+            else:
+                st.session_state.ticket_id += 1
+                st.rerun()
+    _fcol1, _fcol2, _fcol3 = st.columns([3, 2, 2])
+    with _fcol1:
+        st.checkbox("Skip unpaid / unavailable tickets", key="skip_unpaid")
+    with _fcol2:
+        st.selectbox("Running number", ["All", "KZS", "KZK", "Others"], key="prefix_filter")
+    with _fcol3:
+        st.checkbox("Open date tickets only", key="open_date_only")
+
+ticket_id = st.session_state.ticket_id
 
 
 def format_text(text: str) -> str:
