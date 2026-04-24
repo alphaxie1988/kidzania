@@ -136,6 +136,12 @@ header[data-testid="stHeader"] { display: none !important; }
     margin: 0;
     line-height: 1.1;
 }
+
+/* ── Equal-width columns ─────────────────────────── */
+[data-testid="column"] {
+    width: 33% !important;
+    flex: 1 1 33% !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
