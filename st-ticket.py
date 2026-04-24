@@ -3,32 +3,10 @@ import requests
 
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Ticket Users Visualizer", page_icon="🎫")
-
-components.html("""
-<script>
-function hideStreamlitBranding() {
-    const doc = window.parent.document;
-    const selectors = [
-        '[class*="profileContainer"]',
-        '[class*="viewerBadge"]',
-        '[class*="profilePreview"]',
-        'a[href*="share.streamlit.io/user"]',
-        'a[href="https://streamlit.io/cloud"]'
-    ];
-    selectors.forEach(sel => {
-        doc.querySelectorAll(sel).forEach(el => el.style.setProperty('display', 'none', 'important'));
-    });
-}
-hideStreamlitBranding();
-const observer = new MutationObserver(hideStreamlitBranding);
-observer.observe(window.parent.document.body, { childList: true, subtree: true });
-</script>
-""", height=0)
 
 st.markdown("""
 <style>
@@ -113,11 +91,6 @@ h2, h3 { color: var(--kz-navy) !important; }
 /* ── Hide sidebar & header ───────────────────────── */
 section[data-testid="stSidebar"] { display: none !important; }
 header[data-testid="stHeader"] { display: none !important; }
-
-/* ── Hide Streamlit branding ─────────────────────── */
-[class*="profileContainer"] { display: none !important; }
-[class*="viewerBadge"] { display: none !important; }
-[class*="profilePreview"] { display: none !important; }
 
 /* ── Sticky ticket nav bar ───────────────────────── */
 [data-testid="stVerticalBlock"]:has(> div > [data-testid="stMarkdownContainer"] > #ticket-nav-root) {
