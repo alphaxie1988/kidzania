@@ -3,10 +3,32 @@ import requests
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Ticket Users Visualizer", page_icon="🎫")
+
+components.html("""
+<script>
+function hideStreamlitBranding() {
+    const doc = window.parent.document;
+    const selectors = [
+        '[class*="profileContainer"]',
+        '[class*="viewerBadge"]',
+        '[class*="profilePreview"]',
+        'a[href*="share.streamlit.io/user"]',
+        'a[href="https://streamlit.io/cloud"]'
+    ];
+    selectors.forEach(sel => {
+        doc.querySelectorAll(sel).forEach(el => el.style.setProperty('display', 'none', 'important'));
+    });
+}
+hideStreamlitBranding();
+const observer = new MutationObserver(hideStreamlitBranding);
+observer.observe(window.parent.document.body, { childList: true, subtree: true });
+</script>
+""", height=0)
 
 st.markdown("""
 <style>
