@@ -93,8 +93,8 @@ section[data-testid="stSidebar"] { display: none !important; }
 header[data-testid="stHeader"] { display: none !important; }
 
 /* ── Hide Streamlit branding ─────────────────────── */
-._profileContainer_gzau3_53 { display: none !important; }
-._container_gzau3_1._viewerBadge_nim44_23 { display: none !important; }
+a[href*="share.streamlit.io/user"] { display: none !important; }
+a[href="https://streamlit.io/cloud"] { display: none !important; }
 
 /* ── Sticky ticket nav bar ───────────────────────── */
 [data-testid="stVerticalBlock"]:has(> div > [data-testid="stMarkdownContainer"] > #ticket-nav-root) {
