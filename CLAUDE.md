@@ -13,3 +13,4 @@ Generates and displays ticket layouts for Kidzania events.
 npm run dev      # http://localhost:3000
 npm run build
 ```
+No environment variables required — fully static, no external APIs.
